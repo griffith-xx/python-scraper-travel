@@ -6,16 +6,163 @@
     <title>Scraper</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
       rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
     />
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/index.css') }}"
-    />
+    <style>
+      [v-cloak] {
+        display: none;
+      }
+    </style>
   </head>
   <body>
-    <div id="app">[[ message ]]</div>
+    <div id="app">
+      <div class="container mx-auto p-5">
+        <div>
+          <form @submit.prevent="scraper" class="mb-3">
+            <label for="url" class="form-label"> Enter Url </label>
+            <input
+              v-model="inputUrl"
+              type="text"
+              class="form-control"
+              id="url"
+              placeholder="agoda.com/th-th/palette-luxe-north-pattaya/hotel/pattaya-th.html"
+            />
+
+            <button
+              type="submit"
+              class="btn btn-primary mt-3"
+              :disabled="state.loadingScraper"
+              v-text="state.loadingScraper ? 'Loading...' : 'Scrape' "
+            ></button>
+          </form>
+        </div>
+
+        <div
+          style="min-height: 500px"
+          class="bg-body-secondary rounded p-3 mb-5"
+        >
+          <div v-if="scrapeData">
+            <span class="badge text-bg-success mb-3">
+              Status [[ scrapeData.status_code ]]
+            </span>
+            <pre>[[JSON.stringify(scrapeData.data, null, 2)]]</pre>
+          </div>
+
+          <div v-if="state.loadingScraper">Loading...</div>
+        </div>
+
+        <ul>
+          <li v-if="state.loadingDestinationHistories">Loading...</li>
+          <li v-else-if="destinationHistories.length === 0">
+            No destination history found.
+          </li>
+          <li v-else v-for="history in destinationHistories" :key="history.id">
+            <span>[[history.url]]</span>
+            <pre>[[JSON.stringify(history.body, null, 2)]]</pre>
+          </li>
+        </ul>
+      </div>
+    </div>
   </body>
-  <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+  <script>
+    const { createApp, ref } = Vue;
+
+    createApp({
+      delimiters: ["[[", "]]"],
+      setup() {
+        const baseApiUrl = "http://127.0.0.1:8000/api";
+        const destinationHistories = ref([]);
+        const inputUrl = ref("");
+        const state = ref({
+          loadingScraper: false,
+          loadingDestinationHistories: false,
+        });
+        const scrapeData = ref(null);
+
+        const fetchDestinations = async () => {
+          try {
+            state.value.loadingDestinationHistories = true;
+            const response = await fetch(
+              `${baseApiUrl}/destinations/history/scraper`
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              console.error("Error fetching history destinations:", data);
+              alert(
+                `Error: ${
+                  data.error || data.message || "Failed to fetch destinations"
+                }`
+              );
+              return;
+            }
+
+            destinationHistories.value = data;
+          } catch (error) {
+            console.error("Error fetching history destinations:", error);
+            alert(`Error: ${error.message}`);
+          } finally {
+            state.value.loadingDestinationHistories = false;
+          }
+        };
+
+        const scraper = async () => {
+          try {
+            state.value.loadingScraper = true;
+            const url = inputUrl.value;
+
+            if (!url) {
+              alert("Please enter a URL");
+              return;
+            }
+
+            const response = await fetch("/scraper", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ url }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              console.error("Error scraping:", data);
+              alert(`Error: ${data.error || data.message || "Unknown error"}`);
+              return;
+            }
+
+            console.log("Scraped data:", data);
+            scrapeData.value = data;
+          } catch (error) {
+            console.error("Error scraping:", error);
+            alert(`Error: ${error.message}`);
+          } finally {
+            state.value.loadingScraper = false;
+          }
+        };
+
+        return {
+          state,
+          destinationHistories,
+          fetchDestinations,
+          inputUrl,
+          scraper,
+          scrapeData,
+        };
+      },
+      mounted() {
+        this.fetchDestinations();
+      },
+    }).mount("#app");
+  </script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+    crossorigin="anonymous"
+  ></script>
 </html>
