@@ -5,164 +5,280 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scraper</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-      crossorigin="anonymous"
-    />
+
     <style>
       [v-cloak] {
         display: none;
       }
     </style>
   </head>
+
   <body>
-    <div id="app">
-      <div class="container mx-auto p-5">
-        <div>
-          <form @submit.prevent="scraper" class="mb-3">
-            <label for="url" class="form-label"> Enter Url </label>
+    <div id="app" v-cloak>
+      <div>
+        <h1>Web Scraper</h1>
+
+        <form @submit.prevent="scraper">
+          <div>
+            <label for="url">Enter URL</label>
             <input
               v-model="inputUrl"
               type="text"
-              class="form-control"
               id="url"
-              placeholder="agoda.com/th-th/palette-luxe-north-pattaya/hotel/pattaya-th.html"
+              placeholder="https://www.agoda.com/..."
+              required
             />
+          </div>
+          <button type="submit" :disabled="isLoading">
+            [[ isLoading ? 'Scraping...' : 'Scrape' ]]
+          </button>
+        </form>
 
-            <button
-              type="submit"
-              class="btn btn-primary mt-3"
-              :disabled="state.loadingScraper"
-              v-text="state.loadingScraper ? 'Loading...' : 'Scrape' "
-            ></button>
-          </form>
-        </div>
+        <div v-if="scrapeData">
+          <h2>Scrape Result</h2>
+          <p>Status: [[ scrapeData.status_code ]]</p>
 
-        <div
-          style="min-height: 500px"
-          class="bg-body-secondary rounded p-3 mb-5"
-        >
-          <div v-if="scrapeData">
-            <span class="badge text-bg-success mb-3">
-              Status [[ scrapeData.status_code ]]
-            </span>
-            <pre>[[JSON.stringify(scrapeData.data, null, 2)]]</pre>
+          <div v-if="scrapeData.success">
+            <pre>[[ JSON.stringify(scrapeData.data, null, 2) ]]</pre>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                grid-gap: 16px;
+              "
+              v-if="scrapeData.data.image_urls"
+            >
+              <img
+                v-for="image in scrapeData.data.image_urls"
+                :src="image"
+                alt="image preview"
+              />
+            </div>
+            <button @click="clearData">Clear</button>
+            <button @click="saveDestinationHistory">Save Destination</button>
           </div>
 
-          <div v-if="state.loadingScraper">Loading...</div>
+          <div v-else>
+            <p>Error: [[ scrapeData.error || scrapeData.message ]]</p>
+          </div>
         </div>
 
-        <ul>
-          <li v-if="state.loadingDestinationHistories">Loading...</li>
-          <li v-else-if="destinationHistories.length === 0">
-            No destination history found.
-          </li>
-          <li v-else v-for="history in destinationHistories" :key="history.id">
-            <span>[[history.url]]</span>
-            <pre>[[JSON.stringify(history.body, null, 2)]]</pre>
-          </li>
-        </ul>
+        <hr />
+
+        <h2>Scrape History</h2>
+
+        <div v-if="isLoadingHistory">Loading histories...</div>
+
+        <div v-else-if="destinationHistories.length === 0">
+          No history found.
+        </div>
+
+        <div v-else>
+          <div
+            v-for="(history, index) in destinationHistories"
+            :key="history.id"
+          >
+            <h3>[[ index + 1 ]]. [[ history.url ]]</h3>
+            <p>Date: [[ formatDate(history.created_at) ]]</p>
+            <pre>
+              [[ JSON.stringify(parseJsonData(history.body), null, 2) ]]
+            </pre>
+            <button @click="deleteDestinationHistory(history.id)" type="button">
+              ลบ
+            </button>
+            <hr />
+          </div>
+        </div>
       </div>
     </div>
-  </body>
-  <script>
-    const { createApp, ref } = Vue;
 
-    createApp({
-      delimiters: ["[[", "]]"],
-      setup() {
-        const baseApiUrl = "http://127.0.0.1:8000/api";
-        const destinationHistories = ref([]);
-        const inputUrl = ref("");
-        const state = ref({
-          loadingScraper: false,
-          loadingDestinationHistories: false,
-        });
-        const scrapeData = ref(null);
+    <script>
+      const { createApp, ref, onMounted } = Vue;
 
-        const fetchDestinations = async () => {
-          try {
-            state.value.loadingDestinationHistories = true;
-            const response = await fetch(
-              `${baseApiUrl}/destinations/history/scraper`
-            );
+      createApp({
+        delimiters: ["[[", "]]"],
+        setup() {
+          const baseApiUrl = "http://127.0.0.1:8000/api";
+          const destinationHistories = ref([]);
+          const inputUrl = ref("");
+          const scrapeData = ref(null);
+          const isLoading = ref(false);
+          const isLoadingHistory = ref(false);
 
-            const data = await response.json();
-
-            if (!response.ok) {
-              console.error("Error fetching history destinations:", data);
-              alert(
-                `Error: ${
-                  data.error || data.message || "Failed to fetch destinations"
-                }`
+          const fetchDestinationHistories = async () => {
+            isLoadingHistory.value = true;
+            try {
+              const response = await fetch(
+                `${baseApiUrl}/destinations/history/scraper`
               );
-              return;
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(
+                  data.error || data.message || "Failed to fetch histories"
+                );
+              }
+
+              destinationHistories.value = data;
+            } catch (error) {
+              console.error("Error fetching histories:", error);
+              alert(`Error: ${error.message}`);
+            } finally {
+              isLoadingHistory.value = false;
             }
+          };
 
-            destinationHistories.value = data;
-          } catch (error) {
-            console.error("Error fetching history destinations:", error);
-            alert(`Error: ${error.message}`);
-          } finally {
-            state.value.loadingDestinationHistories = false;
-          }
-        };
+          const saveDestinationHistory = async () => {
+            try {
+              const cleanUrl = scrapeData.value.url.split("?")[0];
 
-        const scraper = async () => {
-          try {
-            state.value.loadingScraper = true;
-            const url = inputUrl.value;
+              const response = await fetch(
+                `${baseApiUrl}/destinations/history/scraper`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    url: scrapeData.value.url,
+                    body: JSON.stringify(scrapeData.value.data),
+                    http_status_code: scrapeData.value.status_code,
+                  }),
+                }
+              );
 
-            if (!url) {
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(
+                  data.error ||
+                    data.message ||
+                    "Failed to save  destination history"
+                );
+              }
+
+              alert("Destination history saved successfully!");
+              inputUrl.value = "";
+              fetchDestinationHistories();
+            } catch (error) {
+              console.error("Error saving destination:", error);
+              alert(`Error: ${error.message}`);
+            }
+          };
+
+          const scraper = async () => {
+            if (!inputUrl.value.trim()) {
               alert("Please enter a URL");
               return;
             }
 
-            const response = await fetch("/scraper", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ url }),
-            });
+            isLoading.value = true;
+            try {
+              const response = await fetch("/scraper", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: inputUrl.value }),
+              });
 
-            const data = await response.json();
+              const data = await response.json();
 
-            if (!response.ok) {
-              console.error("Error scraping:", data);
-              alert(`Error: ${data.error || data.message || "Unknown error"}`);
+              if (!response.ok) {
+                throw new Error(
+                  data.error || data.message || "Scraping failed"
+                );
+              }
+
+              scrapeData.value = data;
+            } catch (error) {
+              console.error("Error scraping:", error);
+              alert(`Error: ${error.message}`);
+              scrapeData.value = {
+                success: false,
+                error: error.message,
+                status_code: 500,
+              };
+            } finally {
+              isLoading.value = false;
+            }
+          };
+
+          const clearData = () => {
+            scrapeData.value = null;
+            inputUrl.value = "";
+          };
+
+          const formatDate = (date) => {
+            if (!date) return "";
+            const d = new Date(date);
+            const thaiDate = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+            const month = String(thaiDate.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(thaiDate.getUTCDate()).padStart(2, "0");
+            const year = thaiDate.getUTCFullYear();
+            const hours = String(thaiDate.getUTCHours()).padStart(2, "0");
+            const minutes = String(thaiDate.getUTCMinutes()).padStart(2, "0");
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
+          };
+
+          const parseJsonData = (data) => {
+            if (!data) return null;
+            if (typeof data === "string") {
+              try {
+                return JSON.parse(data);
+              } catch (e) {
+                console.error("Error parsing JSON:", e);
+                return data;
+              }
+            }
+            return data;
+          };
+
+          const deleteDestinationHistory = async (id) => {
+            if (!confirm("คุณต้องการลบประวัติการ scrape นี้หรือไม่?")) {
               return;
             }
 
-            console.log("Scraped data:", data);
-            scrapeData.value = data;
-          } catch (error) {
-            console.error("Error scraping:", error);
-            alert(`Error: ${error.message}`);
-          } finally {
-            state.value.loadingScraper = false;
-          }
-        };
+            try {
+              const response = await fetch(
+                `${baseApiUrl}/destinations/history/scraper/${id}`,
+                {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                }
+              );
 
-        return {
-          state,
-          destinationHistories,
-          fetchDestinations,
-          inputUrl,
-          scraper,
-          scrapeData,
-        };
-      },
-      mounted() {
-        this.fetchDestinations();
-      },
-    }).mount("#app");
-  </script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-    crossorigin="anonymous"
-  ></script>
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(
+                  data.error || data.message || "Failed to delete history"
+                );
+              }
+
+              alert("ลบประวัติสำเร็จ!");
+              fetchDestinationHistories();
+            } catch (error) {
+              console.error("Error deleting history:", error);
+              alert(`Error: ${error.message}`);
+            }
+          };
+
+          onMounted(() => {
+            fetchDestinationHistories();
+          });
+
+          return {
+            destinationHistories,
+            inputUrl,
+            scraper,
+            scrapeData,
+            saveDestinationHistory,
+            formatDate,
+            parseJsonData,
+            clearData,
+            isLoading,
+            isLoadingHistory,
+            deleteDestinationHistory,
+          };
+        },
+      }).mount("#app");
+    </script>
+  </body>
 </html>

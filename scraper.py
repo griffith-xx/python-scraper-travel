@@ -32,6 +32,15 @@ def get_page_destination_data(url, headless=True, timeout=10):
             except:
                 status_code = None
 
+        # ตรวจสอบ status_code ก่อนทำ scraping
+        if status_code and status_code != 200:
+            return {
+                "success": False,
+                "url": url,
+                "message": f"HTTP Error: Status code {status_code}",
+                "status_code": status_code,
+            }
+
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         driver.set_page_load_timeout(timeout)
@@ -59,21 +68,46 @@ def get_page_destination_data(url, headless=True, timeout=10):
         except:
             address = None
 
+        try:
+            image_elements = WebDriverWait(driver, 10).until(
+                EC.presence_of_all_elements_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "img.sc-eCssSg.Imagestyled__ImageStyled-sc-zu5jhi-0.ihStnv",
+                    )
+                )
+            )
+            image_urls = [element.get_attribute("src") for element in image_elements]
+        except:
+            image_urls = None
+
         return {
             "success": True,
             "data": {
                 "title": title,
                 "name": name,
                 "address": address,
+                "image_urls": image_urls,
             },
             "url": url,
             "status_code": status_code or 200,
         }
 
     except Exception as e:
+        error_message = str(e)
+
+        # จัดการ error message ให้อ่านง่ายขึ้น
+        if "timeout" in error_message.lower():
+            error_message = f"Page load timeout: The page took longer than {timeout} seconds to load"
+        elif "no such element" in error_message.lower():
+            error_message = "Unable to find required elements on the page"
+        elif "invalid argument" in error_message.lower():
+            error_message = "Invalid URL format"
+
         return {
             "success": False,
             "url": url,
+            "message": error_message,
             "error": str(e),
             "status_code": status_code or 500,
         }
@@ -81,9 +115,3 @@ def get_page_destination_data(url, headless=True, timeout=10):
     finally:
         if driver:
             driver.quit()
-
-
-if __name__ == "__main__":
-    url = "https://www.agoda.com/th-th/palette-luxe-north-pattaya/hotel/pattaya-th.html"
-    result = get_page_destination_data(url, headless=False, timeout=10)
-    print(result)
