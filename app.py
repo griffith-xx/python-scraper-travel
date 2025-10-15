@@ -1,6 +1,17 @@
-from selenium import webdriver
+import os
+from dotenv import load_dotenv
+from flask import Flask, render_template
 
-driver = webdriver.Chrome()
-driver.get("https://www.agoda.com/th-th/baron-beach-hotel/hotel/pattaya-th.html?ds=lQ6UVmoPoGPBue45")
-print(driver.title)
-driver.quit()
+load_dotenv()
+
+app = Flask(__name__)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(debug=True, port=port)
