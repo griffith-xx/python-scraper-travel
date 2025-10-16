@@ -1,284 +1,608 @@
 <!DOCTYPE html>
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Scraper</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <style>
-      [v-cloak] {
-        display: none;
-      }
-    </style>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scraper</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+  </style>
+</head>
 
-  <body>
-    <div id="app" v-cloak>
-      <div>
-        <h1>Web Scraper</h1>
+<body>
+  <div id="app" v-cloak class="min-h-screen bg-white">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+      <h1 class="text-4xl font-bold text-blue-600 mb-8">Web Scraper</h1>
 
-        <form @submit.prevent="scraper">
-          <div>
-            <label for="url">Enter URL</label>
-            <input
-              v-model="inputUrl"
-              type="text"
-              id="url"
-              placeholder="https://www.agoda.com/..."
-              required
-            />
-          </div>
-          <button type="submit" :disabled="isLoading">
-            [[ isLoading ? 'Scraping...' : 'Scrape' ]]
-          </button>
-        </form>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="space-y-4">
+          <!-- Filters -->
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h2 class="text-lg font-bold text-gray-900 mb-3">Filters</h2>
+            <div class="space-y-3">
+              <div>
+                <label for="province" class="block text-xs font-semibold text-gray-700 mb-1.5">Province</label>
+                <select id="province" name="province" v-model="selectedProvince"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white">
+                  <option v-for="province in provinces" :key="province.id" :value="province.id">
+                    [[province.id]] - [[province.name]]
+                  </option>
+                </select>
+              </div>
 
-        <div v-if="scrapeData">
-          <h2>Scrape Result</h2>
-          <p>Status: [[ scrapeData.status_code ]]</p>
-
-          <div v-if="scrapeData.success">
-            <pre>[[ JSON.stringify(scrapeData.data, null, 2) ]]</pre>
-            <div
-              style="
-                display: grid;
-                grid-template-columns: repeat(5, minmax(0, 1fr));
-                grid-gap: 16px;
-              "
-              v-if="scrapeData.data.image_urls"
-            >
-              <img
-                v-for="image in scrapeData.data.image_urls"
-                :src="image"
-                alt="image preview"
-              />
+              <div>
+                <label for="category" class="block text-xs font-semibold text-gray-700 mb-1.5">Category</label>
+                <select id="category" name="category" v-model="selectedCategory"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white">
+                  <option v-for="category in categories" :key="category.id" :value="category.id">
+                    [[category.id]] - [[category.name]]
+                  </option>
+                </select>
+              </div>
             </div>
-            <button @click="clearData">Clear</button>
-            <button @click="saveDestinationHistory">Save Destination</button>
           </div>
 
-          <div v-else>
-            <p>Error: [[ scrapeData.error || scrapeData.message ]]</p>
+          <!-- Scrape Form -->
+          <form @submit.prevent="scraper" class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <h2 class="text-lg font-bold text-gray-900 mb-3">
+              Scrape URL
+            </h2>
+            <div class="space-y-3">
+              <div>
+                <label for="url" class="block text-xs font-semibold text-gray-700 mb-1.5">Enter URL</label>
+                <input v-model="inputUrl" type="text" id="url" placeholder="https://www.agoda.com/..." required
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" />
+              </div>
+              <button type="submit" :disabled="isLoading"
+                class="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+                [[ isLoading ? '⏳ Scraping...' : '🔍 Scrape' ]]
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Scrape Result -->
+        <div v-if="scrapeData" class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <h2 class="text-lg font-bold text-gray-900 mb-3">
+            Scrape Result
+          </h2>
+
+          <div class="mb-3">
+            <span class="text-xs text-gray-600">Status:</span>
+            <span class="ml-1 text-xs font-bold px-2 py-1 rounded"
+              :class="scrapeData.status_code === 200 ? 'bg-green-600 text-white' : 'bg-red-600 text-white'">
+              [[ scrapeData.status_code ]]
+            </span>
+          </div>
+
+          <div v-if="scrapeData.success" class="space-y-3">
+            <!-- JSON Data -->
+            <pre
+              class="bg-gray-50 p-3 rounded-lg text-xs overflow-x-auto border border-gray-200 font-mono">[[ JSON.stringify(scrapeData.data, null, 2) ]]</pre>
+
+            <!-- Gallery Images -->
+            <div v-if="scrapeData.data.gallery_images && scrapeData.data.gallery_images.length > 0">
+              <p class="text-xs font-semibold text-gray-700 mb-2">📸 Gallery Images ([[
+                scrapeData.data.gallery_images.length ]])</p>
+              <div class="grid grid-cols-3 gap-2">
+                <img v-for="(image, idx) in scrapeData.data.gallery_images" :key="idx" :src="image" alt="image preview"
+                  class="w-full h-24 object-cover rounded border border-gray-200 hover:scale-105 transition" />
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2 pt-2">
+              <button @click="clearData"
+                class="flex-1 bg-gray-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition">
+                🗑 Clear
+              </button>
+              <button @click="saveDestination"
+                class="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+                💾 Save
+              </button>
+            </div>
+          </div>
+
+          <!-- Error Message -->
+          <div v-else class="bg-red-600 text-white rounded-lg p-3">
+            <p class="text-sm font-semibold">❌ Error</p>
+            <p class="text-xs mt-1">
+              [[ scrapeData.error || scrapeData.message ]]
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-gray-200 my-8" />
+
+      <div class="space-y-8">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 class="text-xl font-bold text-gray-900 mb-4">
+            Destinations
+          </h2>
+
+          <div v-if="destinations.length === 0" class="text-center py-12 text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            No destination found.
+          </div>
+
+          <div v-else class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="(destination, index) in destinations" :key="destination.id"
+              class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+
+              <!-- Cover Image -->
+              <img :src="destination.cover_image" :alt="destination.name" class="w-full h-40 object-cover" />
+
+              <!-- Gallery Images -->
+              <div class="grid grid-cols-6 gap-1 p-2 bg-gray-50" v-if="destination.gallery_images">
+                <img class="w-full h-16 object-cover rounded" v-for="image in destination.gallery_images" :src="image"
+                  :alt="image.name" />
+              </div>
+
+              <div class="p-4">
+                <!-- Category & Province Tags -->
+                <div class="flex gap-1.5 mb-2">
+                  <span class="bg-indigo-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    [[ destination.province.name ]]
+                  </span>
+                  <span class="bg-purple-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    [[ destination.category.name ]]
+                  </span>
+                </div>
+
+                <!-- Name -->
+                <h3 class="text-base font-bold text-gray-900 mb-2">
+                  [[ destination.name ]]
+                </h3>
+
+                <!-- Description -->
+                <p class="text-xs text-gray-600 line-clamp-2 mb-3">
+                  [[ destination.short_description ? destination.short_description : destination.description ]]
+                </p>
+
+                <!-- Address -->
+                <div class="text-xs text-gray-500 mb-3 space-y-1">
+                  <p class="line-clamp-2">
+                    📍 [[ destination.address || "-" ]]
+                    [[ destination.subdistrict ? `แขวง/ตำบล${destination.subdistrict}` : "" ]]
+                    [[ destination.district ? `เขต/อำเภอ${destination.district}` : "" ]]
+                    [[ destination.province?.name || "" ]]
+                    [[ destination.postal_code || "" ]]
+                  </p>
+
+                  <p v-if="destination.phone">📞 [[ destination.phone ]]</p>
+                  <p v-if="destination.email">✉️ [[ destination.email ]]</p>
+                  <p v-if="destination.website" class="truncate">🌐 [[ destination.website ]]</p>
+                  <p v-if="destination.line_id">💬 [[ destination.line_id ]]</p>
+                  <p v-if="destination.facebook" class="truncate">📘 [[ destination.facebook ]]</p>
+                  <p v-if="destination.instagram" class="truncate">📷 [[ destination.instagram ]]</p>
+                </div>
+
+                <!-- Price Range -->
+                <div v-if="destination.price_from && destination.price_to" class="mb-3">
+                  <div class="flex items-center gap-2 text-xs mb-2">
+                    <span class="bg-green-600 text-white font-semibold px-2 py-1 rounded">
+                      [[destination.price_from]] ฿
+                    </span>
+                    <span class="text-gray-400">-</span>
+                    <span class="bg-green-600 text-white font-semibold px-2 py-1 rounded">
+                      [[destination.price_to]] ฿
+                    </span>
+                  </div>
+
+                  <!-- Booking Status -->
+                  <div v-if="destination.accepts_online_booking" class="flex items-center gap-1">
+                    <span class="bg-green-600 text-white text-xs font-medium px-2 py-1 rounded">
+                      ✓ รับจอง
+                    </span>
+                    <a :href="destination.booking_url" target="_blank"
+                      class="text-blue-600 hover:underline text-xs truncate">
+                      [[destination.booking_url]]
+                    </a>
+                  </div>
+                  <span v-else class="bg-red-600 text-white text-xs font-medium px-2 py-1 rounded inline-block">
+                    ✗ ไม่รับจอง
+                  </span>
+                </div>
+
+                <!-- Amenities -->
+                <div class="flex flex-wrap gap-1.5">
+                  <span v-if="destination.has_parking"
+                    class="bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    🅿️ ที่จอดรถ
+                  </span>
+                  <span v-if="destination.has_wifi"
+                    class="bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    📶 Wi-Fi
+                  </span>
+                  <span v-if="destination.has_restaurant"
+                    class="bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    🍴 ร้านอาหาร
+                  </span>
+                  <span v-if="destination.pet_friendly"
+                    class="bg-blue-600 text-white text-xs font-medium px-2 py-1 rounded">
+                    🐾 รับสัตว์เลี้ยง
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <hr />
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 class="text-xl font-bold text-gray-900 mb-4">
+            Scrape History
+          </h2>
 
-        <h2>Scrape History</h2>
+          <div v-if="isLoadingHistory" class="text-center py-12 text-gray-500">
+            <svg class="animate-spin h-8 w-8 mx-auto mb-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none"
+              viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+              </path>
+            </svg>
+            Loading histories...
+          </div>
 
-        <div v-if="isLoadingHistory">Loading histories...</div>
+          <div v-else-if="destinationHistories.length === 0" class="text-center py-12 text-gray-400">
+            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+              </path>
+            </svg>
+            No history found.
+          </div>
 
-        <div v-else-if="destinationHistories.length === 0">
-          No history found.
-        </div>
+          <div v-else class="space-y-3">
+            <div v-for="(history, index) in destinationHistories" :key="history.id"
+              class="bg-gray-50 rounded-lg p-4 border border-gray-200 ">
 
-        <div v-else>
-          <div
-            v-for="(history, index) in destinationHistories"
-            :key="history.id"
-          >
-            <h3>[[ index + 1 ]]. [[ history.url ]]</h3>
-            <p>Date: [[ formatDate(history.created_at) ]]</p>
-            <pre>
-              [[ JSON.stringify(parseJsonData(history.body), null, 2) ]]
-            </pre>
-            <button @click="deleteDestinationHistory(history.id)" type="button">
-              ลบ
-            </button>
-            <hr />
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                  <h3 class="text-sm font-semibold text-gray-900 mb-1">
+                    <span class="text-blue-600">#[[ index + 1 ]]</span> [[ history.url ]]
+                  </h3>
+                  <p class="text-xs text-gray-500">
+                    [[ formatDate(history.created_at) ]]
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <button @click="history.showJson = !history.showJson" type="button"
+                  class="text-xs font-medium px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition">
+                  [[ history.showJson ? '▲ Hide' : '▼ Show' ]] JSON
+                </button>
+
+                <button @click="deleteDestinationHistory(history.id)" type="button"
+                  class="text-xs font-medium px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition">
+                  🗑 Delete
+                </button>
+              </div>
+
+              <pre v-if="history.showJson"
+                class="mt-3 bg-white p-3 rounded border border-gray-300 text-xs overflow-x-auto font-mono">[[ JSON.stringify(parseJsonData(history.body), null, 2) ]]</pre>
+            </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
+  <script>
+    const { createApp, ref, onMounted } = Vue;
 
-    <script>
-      const { createApp, ref, onMounted } = Vue;
+    createApp({
+      delimiters: ["[[", "]]"],
+      setup() {
+        const baseApiUrl = "http://127.0.0.1:8000/api";
+        const inputUrl = ref("");
+        const selectedProvince = ref(null);
+        const selectedCategory = ref(null);
 
-      createApp({
-        delimiters: ["[[", "]]"],
-        setup() {
-          const baseApiUrl = "http://127.0.0.1:8000/api";
-          const destinationHistories = ref([]);
-          const inputUrl = ref("");
-          const scrapeData = ref(null);
-          const isLoading = ref(false);
-          const isLoadingHistory = ref(false);
+        const destinations = ref([]);
+        const destinationHistories = ref([]);
+        const provinces = ref([]);
+        const categories = ref([]);
 
-          const fetchDestinationHistories = async () => {
-            isLoadingHistory.value = true;
-            try {
-              const response = await fetch(
-                `${baseApiUrl}/destinations/history/scraper`
+        const scrapeData = ref(null);
+        const isLoading = ref(false);
+        const isLoadingHistory = ref(false);
+
+        const fetchDestinations = async () => {
+          try {
+            const response = await fetch(`${baseApiUrl}/destinations`);
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Failed to fetch destinations"
               );
-              const data = await response.json();
-
-              if (!response.ok) {
-                throw new Error(
-                  data.error || data.message || "Failed to fetch histories"
-                );
-              }
-
-              destinationHistories.value = data;
-            } catch (error) {
-              console.error("Error fetching histories:", error);
-              alert(`Error: ${error.message}`);
-            } finally {
-              isLoadingHistory.value = false;
             }
-          };
 
-          const saveDestinationHistory = async () => {
-            try {
-              const cleanUrl = scrapeData.value.url.split("?")[0];
+            destinations.value = data;
+          } catch (error) {
+            console.error("Error fetching destinations:", error);
+            alert(`Error: ${error.message}`);
+          }
+        };
 
-              const response = await fetch(
-                `${baseApiUrl}/destinations/history/scraper`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    url: scrapeData.value.url,
-                    body: JSON.stringify(scrapeData.value.data),
-                    http_status_code: scrapeData.value.status_code,
-                  }),
-                }
+        const fetchDestinationHistories = async () => {
+          isLoadingHistory.value = true;
+          try {
+            const response = await fetch(
+              `${baseApiUrl}/destinations/history/scraper`
+            );
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Failed to fetch histories"
               );
-
-              const data = await response.json();
-
-              if (!response.ok) {
-                throw new Error(
-                  data.error ||
-                    data.message ||
-                    "Failed to save  destination history"
-                );
-              }
-
-              alert("Destination history saved successfully!");
-              inputUrl.value = "";
-              fetchDestinationHistories();
-            } catch (error) {
-              console.error("Error saving destination:", error);
-              alert(`Error: ${error.message}`);
-            }
-          };
-
-          const scraper = async () => {
-            if (!inputUrl.value.trim()) {
-              alert("Please enter a URL");
-              return;
             }
 
-            isLoading.value = true;
-            try {
-              const response = await fetch("/scraper", {
+            destinationHistories.value = data.map(history => ({
+              ...history,
+              showJson: false
+            }));
+          } catch (error) {
+            console.error("Error fetching histories:", error);
+            alert(`Error: ${error.message}`);
+          } finally {
+            isLoadingHistory.value = false;
+          }
+        };
+
+        const fetchProvinces = async () => {
+          try {
+            const response = await fetch(`${baseApiUrl}/provinces`);
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Failed to fetch provinces"
+              );
+            }
+
+            provinces.value = data;
+          } catch (error) {
+            console.error("Error fetching provinces:", error);
+            alert(`Error: ${error.message}`);
+          }
+        };
+
+        const fetchCategories = async () => {
+          try {
+            const response = await fetch(`${baseApiUrl}/categories`);
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Failed to fetch categories"
+              );
+            }
+
+            categories.value = data;
+          } catch (error) {
+            console.error("Error fetching categories:", error);
+            alert(`Error: ${error.message}`);
+          }
+        };
+
+        const saveDestinationHistory = async () => {
+          try {
+            const cleanUrl = scrapeData.value.url.split("?")[0];
+
+            const response = await fetch(
+              `${baseApiUrl}/destinations/history/scraper`,
+              {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url: inputUrl.value }),
-              });
-
-              const data = await response.json();
-
-              if (!response.ok) {
-                throw new Error(
-                  data.error || data.message || "Scraping failed"
-                );
+                body: JSON.stringify({
+                  url: scrapeData.value.url,
+                  body: JSON.stringify(scrapeData.value.data),
+                  http_status_code: scrapeData.value.status_code,
+                }),
               }
+            );
 
-              scrapeData.value = data;
-            } catch (error) {
-              console.error("Error scraping:", error);
-              alert(`Error: ${error.message}`);
-              scrapeData.value = {
-                success: false,
-                error: error.message,
-                status_code: 500,
-              };
-            } finally {
-              isLoading.value = false;
-            }
-          };
+            const data = await response.json();
 
-          const clearData = () => {
-            scrapeData.value = null;
-            inputUrl.value = "";
-          };
-
-          const formatDate = (date) => {
-            if (!date) return "";
-            const d = new Date(date);
-            const thaiDate = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-            const month = String(thaiDate.getUTCMonth() + 1).padStart(2, "0");
-            const day = String(thaiDate.getUTCDate()).padStart(2, "0");
-            const year = thaiDate.getUTCFullYear();
-            const hours = String(thaiDate.getUTCHours()).padStart(2, "0");
-            const minutes = String(thaiDate.getUTCMinutes()).padStart(2, "0");
-            return `${day}/${month}/${year} ${hours}:${minutes}`;
-          };
-
-          const parseJsonData = (data) => {
-            if (!data) return null;
-            if (typeof data === "string") {
-              try {
-                return JSON.parse(data);
-              } catch (e) {
-                console.error("Error parsing JSON:", e);
-                return data;
-              }
-            }
-            return data;
-          };
-
-          const deleteDestinationHistory = async (id) => {
-            if (!confirm("คุณต้องการลบประวัติการ scrape นี้หรือไม่?")) {
-              return;
-            }
-
-            try {
-              const response = await fetch(
-                `${baseApiUrl}/destinations/history/scraper/${id}`,
-                {
-                  method: "DELETE",
-                  headers: { "Content-Type": "application/json" },
-                }
+            if (!response.ok) {
+              throw new Error(
+                data.error ||
+                data.message ||
+                "Failed to save  destination history"
               );
-
-              const data = await response.json();
-
-              if (!response.ok) {
-                throw new Error(
-                  data.error || data.message || "Failed to delete history"
-                );
-              }
-
-              alert("ลบประวัติสำเร็จ!");
-              fetchDestinationHistories();
-            } catch (error) {
-              console.error("Error deleting history:", error);
-              alert(`Error: ${error.message}`);
             }
-          };
+            inputUrl.value = "";
+          } catch (error) {
+            console.error("Error saving destination:", error);
+            alert(`Error: ${error.message}`);
+          }
+        };
 
-          onMounted(() => {
+        const saveDestination = async () => {
+
+          if (!selectedProvince.value) {
+            alert("Please select a province");
+            return;
+          }
+
+          if (!selectedCategory.value) {
+            alert("Please select a category");
+            return;
+          }
+
+          const form = {
+            'province_id': selectedProvince.value,
+            'category_id': selectedCategory.value,
+            'name': scrapeData.value.data.name,
+            'name_en': scrapeData.value.data.name_en,
+            'short_description': scrapeData.value.data.description,
+            'address': scrapeData.value.data.address,
+            'cover_image': scrapeData.value.data.cover_image,
+            'gallery_images': scrapeData.value.data.gallery_images,
+            'has_parking': scrapeData.value.data.features.has_parking,
+            'has_wifi': scrapeData.value.data.features.has_wifi,
+            'has_restaurant': scrapeData.value.data.features.has_restaurant,
+          }
+
+          const response = await fetch(`${baseApiUrl}/destinations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          })
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data.error || data.message || "Failed to save destination"
+            );
+          }
+
+          alert("Destination saved successfully!");
+          await fetchDestinations();
+          await saveDestinationHistory();
+          await fetchDestinationHistories();
+        }
+
+        const scraper = async () => {
+          if (!inputUrl.value.trim()) {
+            alert("Please enter a URL");
+            return;
+          }
+
+          isLoading.value = true;
+          try {
+            const response = await fetch("/scraper", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: inputUrl.value }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Scraping failed"
+              );
+            }
+
+            scrapeData.value = data;
+          } catch (error) {
+            console.error("Error scraping:", error);
+            alert(`Error: ${error.message}`);
+            scrapeData.value = {
+              success: false,
+              error: error.message,
+              status_code: 500,
+            };
+          } finally {
+            isLoading.value = false;
+          }
+        };
+
+        const clearData = () => {
+          scrapeData.value = null;
+          inputUrl.value = "";
+        };
+
+        const formatDate = (date) => {
+          if (!date) return "";
+          const d = new Date(date);
+          const thaiDate = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+          const month = String(thaiDate.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(thaiDate.getUTCDate()).padStart(2, "0");
+          const year = thaiDate.getUTCFullYear();
+          const hours = String(thaiDate.getUTCHours()).padStart(2, "0");
+          const minutes = String(thaiDate.getUTCMinutes()).padStart(2, "0");
+          return `${day}/${month}/${year} ${hours}:${minutes}`;
+        };
+
+        const parseJsonData = (data) => {
+          if (!data) return null;
+          if (typeof data === "string") {
+            try {
+              return JSON.parse(data);
+            } catch (e) {
+              console.error("Error parsing JSON:", e);
+              return data;
+            }
+          }
+          return data;
+        };
+
+        const deleteDestinationHistory = async (id) => {
+          if (!confirm("คุณต้องการลบประวัติการ scrape นี้หรือไม่?")) {
+            return;
+          }
+
+          try {
+            const response = await fetch(
+              `${baseApiUrl}/destinations/history/scraper/${id}`,
+              {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || data.message || "Failed to delete history"
+              );
+            }
+
+            alert("ลบประวัติสำเร็จ!");
             fetchDestinationHistories();
-          });
+          } catch (error) {
+            console.error("Error deleting history:", error);
+            alert(`Error: ${error.message}`);
+          }
+        };
 
-          return {
-            destinationHistories,
-            inputUrl,
-            scraper,
-            scrapeData,
-            saveDestinationHistory,
-            formatDate,
-            parseJsonData,
-            clearData,
-            isLoading,
-            isLoadingHistory,
-            deleteDestinationHistory,
-          };
-        },
-      }).mount("#app");
-    </script>
-  </body>
+        onMounted(() => {
+          fetchProvinces();
+          fetchCategories();
+          fetchDestinations();
+          fetchDestinationHistories();
+        });
+
+        return {
+          destinationHistories,
+          inputUrl,
+          scraper,
+          scrapeData,
+          saveDestinationHistory,
+          formatDate,
+          parseJsonData,
+          clearData,
+          isLoading,
+          isLoadingHistory,
+          deleteDestinationHistory,
+          provinces,
+          categories,
+          selectedProvince,
+          selectedCategory,
+          destinations,
+          saveDestination,
+        };
+      },
+    }).mount("#app");
+  </script>
+</body>
+
 </html>
