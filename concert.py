@@ -55,93 +55,14 @@ def get_page_destination_data(url, headless=True, timeout=10):
                 )
             )
             name = name_element.text
-            # name_en = name.split("(")[1].replace(")", "")
-            name_en = ''
         except:
             name = None
 
-        try:
-            description_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "span[data-element-name='property-short-description']",
-                    )
-                )
-            )
-            description = description_element.text
-        except:
-            description = None
-
-        try:
-            address_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "span[data-selenium='hotel-address-map']")
-                )
-            )
-            address = address_element.text
-        except:
-            address = None
-
-        try:
-            image_elements = WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "img.sc-eCssSg.Imagestyled__ImageStyled-sc-zu5jhi-0.ihStnv",
-                    )
-                )
-            )
-            image_urls = [element.get_attribute("src") for element in image_elements]
-        except:
-            image_urls = None
-
-        try:
-            feature_elements = WebDriverWait(driver, 10).until(
-                EC.presence_of_all_elements_located(
-                    (By.CSS_SELECTOR, "div[data-element-name='atf-top-amenities-item']")
-                )
-            )
-
-            features = {
-                "has_wifi": False,
-                "has_parking": False,
-                "has_restaurant": False,
-            }
-
-            for element in feature_elements:
-                p_element = element.find_element(By.TAG_NAME, "p")
-                feature = p_element.text.strip().lower()
-
-                if "wi-fi" in feature or "wifi" in feature:
-                    features["has_wifi"] = True
-                elif "ที่จอดรถ" in feature or "จอดรถ" in feature:
-                    features["has_parking"] = True
-                elif "ห้องอาหาร" in feature or "อาหาร" in feature:
-                    features["has_restaurant"] = True
-
-        except:
-            features = {
-                "has_wifi": False,
-                "has_parking": False,
-                "has_restaurant": False,
-            }
-
         return {
             "success": True,
-            "data": {
-                "title": title,
-                "name": name,
-                "name_en": name_en,
-                "description": description,
-                "address": address,
-                "cover_image": image_urls[0],
-                "gallery_images": (
-                    image_urls[1:] if image_urls and len(image_urls) > 1 else []
-                ),
-                "features": features,
-            },
             "url": url,
+            "title": title,
+            "name": name,
             "status_code": status_code or 200,
         }
 
@@ -167,3 +88,8 @@ def get_page_destination_data(url, headless=True, timeout=10):
     finally:
         if driver:
             driver.quit()
+
+if __name__ == "__main__": 
+    url = "https://www.theconcert.com/concert/4263"
+    result = get_page_destination_data(url,headless=False, timeout=10)
+    print(result)
